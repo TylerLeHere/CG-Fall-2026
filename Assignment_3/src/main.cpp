@@ -131,7 +131,7 @@ double lerp(double a0, double a1, double w)
     assert(w >= 0);
     assert(w <= 1);
     //TODO implement linear and cubic interpolation
-    return a0 + w * (a1 - a0);
+    return a0 + (3 -  w * 2) * w * w * (a1 - a0);
 }
 
 // Computes the dot product of the distance and gradient vectors.
@@ -148,9 +148,9 @@ double dotGridGradient(int ix, int iy, double x, double y)
 double perlin(double x, double y)
 {
     //TODO: Determine grid cell coordinates x0, y0
-    int x0 = int(x);
+    int x0 = std::min(int(x), grid_size - 1);
     int x1 = x0 + 1;
-    int y0 = int(y);
+    int y0 = std::min(int(y), grid_size - 1);
     int y1 = y0 + 1;
 
     // Determine interpolation weights
