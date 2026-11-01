@@ -394,7 +394,11 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
         const Vector4d diffuse = diff_color * std::max(Li.dot(N), 0.0);
 
         // Specular contribution, use obj_specular_color
-        const Vector4d specular(0, 0, 0, 0);
+        // Get the direction towards the viewer
+        const Vector3d V = -ray_direction;
+        const Vector3d H = (Li + V).normalized();
+        // Create highlight using shiny model 
+        const Vector4d specular = obj_specular_color * std::pow(std::max(N.dot(H), 0.0), obj_specular_exponent);
 
         // Attenuate lights according to the squared distance to the lights
         const Vector3d D = light_position - p;
