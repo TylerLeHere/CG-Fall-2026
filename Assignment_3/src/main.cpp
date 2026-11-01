@@ -131,24 +131,26 @@ double lerp(double a0, double a1, double w)
     assert(w >= 0);
     assert(w <= 1);
     //TODO implement linear and cubic interpolation
-    return 0;
+    return a0 + w * (a1 - a0);
 }
 
 // Computes the dot product of the distance and gradient vectors.
 double dotGridGradient(int ix, int iy, double x, double y)
 {
-    //TODO: Compute the distance vector
+    //TODO: Compute the distance vector - arrow from the corner to the location
+
     //TODO: Compute and return the dot-product
-    return 0;
+    const Vector2d distance(x - ix, y - iy);
+    return distance.dot(grid[ix][iy]);
 }
 
 // Compute Perlin noise at coordinates x, y
 double perlin(double x, double y)
 {
     //TODO: Determine grid cell coordinates x0, y0
-    int x0 = 0;
+    int x0 = int(x);
     int x1 = x0 + 1;
-    int y0 = 0;
+    int y0 = int(y);
     int y1 = y0 + 1;
 
     // Determine interpolation weights
@@ -179,12 +181,12 @@ Vector4d procedural_texture(const double tu, const double tv)
     assert(tv <= 1);
 
     //TODO: uncomment these lines once you implement the perlin noise
-    // const double color = (perlin(tu * grid_size, tv * grid_size) + 1) / 2;
-    // return Vector4d(0, color, 0, 0);
-
-    //Example fo checkerboard texture
-    const double color = (int(tu * grid_size) + int(tv * grid_size)) % 2 == 0 ? 0 : 1;
+    const double color = (perlin(tu * grid_size, tv * grid_size) + 1) / 2;
     return Vector4d(0, color, 0, 0);
+
+    // //Example fo checkerboard texture
+    // const double color = (int(tu * grid_size) + int(tv * grid_size)) % 2 == 0 ? 0 : 1;
+    // return Vector4d(0, color, 0, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
