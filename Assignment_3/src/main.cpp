@@ -438,6 +438,15 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
     // TODO: Compute the color of the reflected ray and add its contribution to the current point color.
     // use refl_color
     Vector4d reflection_color(0, 0, 0, 0);
+    if (max_bounce > 0)
+    {
+        // Calculate the reflection direction
+        const Vector3d reflectedDirection = ray_direction - 2 * (ray_direction.dot(N)) * N;
+
+        const Vector3d reflectionOrigin = p + 1e-4 * reflectedDirection;
+        // Shooting the reflected ray recursively
+        reflection_color = refl_color.cwiseProduct(shoot_ray(reflectionOrigin, reflectedDirection, max_bounce - 1));
+    }
 
     // TODO: Compute the color of the refracted ray and add its contribution to the current point color.
     //       Make sure to check for total internal reflection before shooting a new ray.
