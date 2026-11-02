@@ -29,6 +29,8 @@ const bool is_perspective = true;
 const Vector3d camera_position(0, 0, 5);
 const double camera_aperture = 0.05;
 
+const bool enableDepthOfField = false; //Enable to see bonus 1 work
+const bool enableRefraction = false; //Enable to see bonus 2 work
 //Maximum number of recursive calls
 const int max_bounce = 5;
 
@@ -67,7 +69,12 @@ void setup_scene()
     }
 
     //Spheres
-    sphere_centers.emplace_back(10, 0, 1);
+
+    if (enableDepthOfField){
+        sphere_centers.emplace_back(6, 0, -5);
+    }else{
+        sphere_centers.emplace_back(10, 0, 1);
+    }
     sphere_radii.emplace_back(1);
 
     sphere_centers.emplace_back(7, 0.05, -1);
@@ -455,7 +462,7 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
     Vector4d refraction_color(0, 0, 0, 0);
 
     // Attempt for bonus2
-    bool enableRefraction = false; // Set to true to enable refraction for spheres
+    // Set to true to enable refraction for spheres
     if(max_bounce > 0 && nearest_object < sphere_centers.size() &&enableRefraction) // Only refract for spheres
     {
         double incidentRefractiveIndex = 1.0; // Refractive index of air
@@ -543,7 +550,35 @@ void raytrace_scene()
                 ray_direction = Vector3d(0, 0, -1);
             }
 
-            const Vector4d C = shoot_ray(ray_origin, ray_direction, max_bounce);
+
+
+            Vector4d C(0,0,0,0);
+
+            if(enableDepthOfField && is_perspective)
+            {
+                int samplesPerPixel = 32;
+
+                const Vector3d focusPoint = camera_position + pixel_center * (focal_length / image_z);
+
+                for (auto sample = 0; sample < samplesPerPixel; sample++){
+                    Vector2d lenSample;
+
+                    do{
+                        lenSample = Vector2d::Random();
+                    }while (lenSample.squaredNorm() > 1);
+                    lenSample *= camera_aperture;
+
+                    const Vector3d sampleOrigin = camera_position + Vector3d(lenSample.x(), lenSample.y(), 0);
+                    const Vector3d sampleDirection = (focusPoint - sampleOrigin).normalized();
+                    C += shoot_ray(sampleOrigin, sampleDirection, max_bounce);
+                }
+                C /= samplesPerPixel;
+            }else{
+                C = shoot_ray(ray_origin, ray_direction, max_bounce);
+            }
+
+
+
             R(i, j) = C(0);
             G(i, j) = C(1);
             B(i, j) = C(2);
