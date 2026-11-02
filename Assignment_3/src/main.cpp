@@ -454,6 +454,37 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
     //       Make sure to check for total internal reflection before shooting a new ray.
     Vector4d refraction_color(0, 0, 0, 0);
 
+    // Attempt for bonus2
+    bool enableRefraction = false; // Set to true to enable refraction for spheres
+    if(max_bounce > 0 && nearest_object < sphere_centers.size() &&enableRefraction) // Only refract for spheres
+    {
+        double incidentRefractiveIndex = 1.0; // Refractive index of air
+        double transmittedRefractiveIndex = 1.5; // Refractive index of the sphere material
+
+        Vector3d normal = N;
+        double incidentCosine = -ray_direction.dot(normal);
+
+        // If the ray is leaving the sphere, we need to swap the refractive indices and flip the normal
+        if(incidentCosine < 0)
+        {
+            std::swap(incidentRefractiveIndex, transmittedRefractiveIndex);
+            normal = -normal;
+            incidentCosine = -incidentCosine;
+        }
+
+        double refractiveRatio = incidentRefractiveIndex / transmittedRefractiveIndex;
+        double transmittedConsineSquared = 1.0 - refractiveRatio * refractiveRatio * (1.0 - incidentCosine * incidentCosine);
+
+        // If it is negative, internal reflection occurs
+        if (transmittedConsineSquared >= 0){
+            double transmittedCosine = std::sqrt(transmittedConsineSquared);
+            const Vector3d refractedDirection = refractiveRatio * ray_direction + (refractiveRatio * incidentCosine - transmittedCosine) * normal;
+            const Vector3d refractionOrigin = p + 1e-4 * refractedDirection;
+            refraction_color = obj_refraction_color.cwiseProduct(shoot_ray(refractionOrigin, refractedDirection, max_bounce - 1));
+        }
+
+    }
+
     // Rendering equation
     Vector4d C = ambient_color + lights_color + reflection_color + refraction_color;
 
