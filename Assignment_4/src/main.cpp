@@ -174,6 +174,7 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
     // If there is only 1 triangle left, then we are at a leaf
     if (to - from == 1)
     {
+
         const int triangle = triangles[from];
         const Vector3d a = V.row(F(triangle, 0)).transpose();
         const Vector3d b = V.row(F(triangle, 1)).transpose();
@@ -202,11 +203,11 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
     Vector3d extent = centroid_box.diagonal();
 
     // Sort triangle indices along the longest centroid axis.
-    Eigen::Index longest_dim;
-    extent.maxCoeff(&longest_dim);
+    Eigen::Index longest_dim_axis;
+    extent.maxCoeff(&longest_dim_axis);
 
     std::sort(triangles.begin() + from, triangles.begin() + to, [&](int f1, int f2) {
-        return centroids(f1, longest_dim) < centroids(f2, longest_dim);
+        return centroids(f1, longest_dim_axis) < centroids(f2, longest_dim_axis);
     });
 
     // Add the parent first so the children can store its index.
@@ -219,7 +220,7 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
     const int index = static_cast<int>(nodes.size());
     nodes.push_back(node);
 
-    // Split into halves, rounding the left half up.
+    // Split into two halves and build the children 
     const int mid = from + (to - from + 1) / 2;
     const int left = build_recursive(V, F, centroids, from, mid, index, triangles);
     const int right = build_recursive(V, F, centroids, mid, to, index, triangles);
@@ -231,10 +232,6 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
 
     return index;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Intersection code
-////////////////////////////////////////////////////////////////////////////////
 
 double ray_triangle_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, const Vector3d &a, const Vector3d &b, const Vector3d &c, Vector3d &p, Vector3d &N)
 {
