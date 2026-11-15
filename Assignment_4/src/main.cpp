@@ -211,7 +211,43 @@ double ray_triangle_intersection(const Vector3d &ray_origin, const Vector3d &ray
     // Compute whether the ray intersects the given triangle.
     // If you have done the parallelogram case, this should be very similar to it.
 
-    return -1;
+    bool is_invertible;
+    Matrix3d inverse;
+    const Vector3d edge_u = b - a;
+    const Vector3d edge_v = c - a;
+
+    Matrix3d system;
+    system.col(0) = -ray_direction;
+    system.col(1) = edge_u;
+    system.col(2) = edge_v;
+
+    system.computeInverseWithCheck(inverse, is_invertible);
+    // If it can not be inverted, then the ray is parallel to the triangle plane, so there is no intersection
+    if (!is_invertible)
+    {
+        return -1;
+    }
+
+    const Vector3d sol = inverse * (ray_origin - a);
+    const double t = sol(0);
+    const double u = sol(1);
+    const double v = sol(2);
+
+    // The intersection must be inside the triangle and along the ray, so t, u and v must be positive and u + v <= 1
+    if (t < 0 || u < 0 || v < 0 || u + v > 1)
+    {
+        return -1;
+    }
+
+    p = ray_origin + t * ray_direction;
+
+    // The normal of the triangle is the cross product of its edges
+    N = edge_u.cross(edge_v).normalized();
+    if(N.dot(ray_direction) > 0)
+    {
+        N = -N;
+    }
+    return t;
 }
 
 bool ray_box_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, const AlignedBox3d &box)
@@ -233,7 +269,27 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
     // Method (2): Traverse the BVH tree and test the intersection with a
     // triangles at the leaf nodes that intersects the input ray.
 
-    return false;
+    double nearest_t = std::numeric_limits<double>::max();
+    bool hit = false;
+
+    // Traverse every triangle and return the closet hit
+    for (auto i = 0; i < facets.rows(); ++i)
+    {
+        const Vector3d a = vertices.row(facets(i, 0));
+        const Vector3d b = vertices.row(facets(i, 1));
+        const Vector3d c = vertices.row(facets(i, 2));
+
+        const double t = ray_triangle_intersection(ray_origin, ray_direction, a, b, c, tmp_p, tmp_N);
+        // Keep the hit if it is closer than the best one so far
+        if (t >= 0 && t < nearest_t)
+        {
+            nearest_t = t;
+            p = tmp_p;
+            N = tmp_N;
+            hit = true;
+        }
+    }
+    return hit;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -306,8 +362,8 @@ void raytrace_scene()
     // and covers an viewing angle given by 'field_of_view'.
     double aspect_ratio = double(w) / double(h);
     //TODO
-    double image_y = 1;
-    double image_x = 1;
+    double image_y = focal_length * std::tan(field_of_view / 2.0);
+    double image_x = image_y * aspect_ratio;
 
     // The pixel grid through which we shoot rays is at a distance 'focal_length'
     const Vector3d image_origin(-image_x, image_y, camera_position[2] - focal_length);
