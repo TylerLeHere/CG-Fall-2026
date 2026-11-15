@@ -174,32 +174,62 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
     // If there is only 1 triangle left, then we are at a leaf
     if (to - from == 1)
     {
-        //TODO create leaf node and retun correct left index
+        const int triangle = triangles[from];
+        const Vector3d a = V.row(F(triangle, 0)).transpose();
+        const Vector3d b = V.row(F(triangle, 1)).transpose();
+        const Vector3d c = V.row(F(triangle, 2)).transpose();
 
-        return -1;
+        Node leaf;
+        leaf.bbox = bbox_from_triangle(a, b, c);
+        leaf.parent = parent;
+        leaf.left = -1;
+        leaf.right = -1;
+        leaf.triangle = triangle;
+
+        nodes.push_back(leaf);
+        return static_cast<int>(nodes.size()) - 1;
     }
 
-    // TODO sort centroids along the longest dimension
-
-    //TODO Use AlignedBox3d to find the box around the current centroids
+    // Find the box around this group's centroids.
     AlignedBox3d centroid_box;
+    for (int i = from; i < to; ++i)
+    {
+        const Vector3d centroid = centroids.row(triangles[i]).transpose();
+        centroid_box.extend(centroid);
+    }
 
     // Diagonal of the box
     Vector3d extent = centroid_box.diagonal();
 
-    //TODO find the largest dimension
-    int longest_dim = 0;
+    // Sort triangle indices along the longest centroid axis.
+    Eigen::Index longest_dim;
+    extent.maxCoeff(&longest_dim);
 
     std::sort(triangles.begin() + from, triangles.begin() + to, [&](int f1, int f2) {
-        //TODO sort the **triangles** along the centroid largest dimension
-        // return true if triangle f1 comes before triangle f2
-        return false;
+        return centroids(f1, longest_dim) < centroids(f2, longest_dim);
     });
 
-    //TODO Create a new internal node and do a recursive call to build the left and right part of the tree
-    //TODO finally return the correct index
+    // Add the parent first so the children can store its index.
+    Node node;
+    node.parent = parent;
+    node.left = -1;
+    node.right = -1;
+    node.triangle = -1;
 
-    return -1;
+    const int index = static_cast<int>(nodes.size());
+    nodes.push_back(node);
+
+    // Split into halves, rounding the left half up.
+    const int mid = from + (to - from + 1) / 2;
+    const int left = build_recursive(V, F, centroids, from, mid, index, triangles);
+    const int right = build_recursive(V, F, centroids, mid, to, index, triangles);
+
+    // Recursion can reallocate nodes, so access the parent by index.
+    nodes[index].left = left;
+    nodes[index].right = right;
+    nodes[index].bbox = nodes[left].bbox.merged(nodes[right].bbox);
+
+    return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
