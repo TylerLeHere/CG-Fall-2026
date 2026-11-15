@@ -35,7 +35,7 @@ public:
     };
 
     std::vector<Node> nodes;
-    int root;
+    int root = -1;
 
     AABBTree() = default;                           // Default empty constructor
     AABBTree(const MatrixXd &V, const MatrixXi &F); // Build a BVH from an existing mesh
@@ -304,7 +304,7 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
         const Vector3d &c = vertices.row(facets(triangle, 2));
 
         const double t = ray_triangle_intersection(ray_origin, ray_direction, a, b, c, tmp_p, tmp_N);
-        if (t > 0 && t < nearest_t)
+        if (t >= 0 && t < nearest_t)
         {
             nearest_t = t;
             p = tmp_p;
@@ -322,7 +322,7 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
         }
         return hit;
     }
-    
+
     return hit;
 
 }
