@@ -50,7 +50,8 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 const std::string data_dir = DATA_DIR;
 const std::string filename("raytrace.png");
-const std::string mesh_filename(data_dir + "dodeca.off");
+const std::string mesh_filename(data_dir + "bunny.off");
+const bool use_bvh = false;
 
 //Camera settings
 const double focal_length = 2;
@@ -263,33 +264,37 @@ bool ray_box_intersection(const Vector3d &ray_origin, const Vector3d &ray_direct
 bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_direction, Vector3d &p, Vector3d &N)
 {
     Vector3d tmp_p, tmp_N;
-
-    // TODO
-    // Method (1): Traverse every triangle and return the closest hit.
-    // Method (2): Traverse the BVH tree and test the intersection with a
-    // triangles at the leaf nodes that intersects the input ray.
-
     double nearest_t = std::numeric_limits<double>::max();
     bool hit = false;
-
-    // Traverse every triangle and return the closet hit
-    for (auto i = 0; i < facets.rows(); ++i)
-    {
-        const Vector3d a = vertices.row(facets(i, 0));
-        const Vector3d b = vertices.row(facets(i, 1));
-        const Vector3d c = vertices.row(facets(i, 2));
+    
+    // Tests one by one all the triangles in the mesh, and keeps it if it is the cloest
+    auto triangle_test = [&](int triangle){
+        const Vector3d &a = vertices.row(facets(triangle, 0));
+        const Vector3d &b = vertices.row(facets(triangle, 1));
+        const Vector3d &c = vertices.row(facets(triangle, 2));
 
         const double t = ray_triangle_intersection(ray_origin, ray_direction, a, b, c, tmp_p, tmp_N);
-        // Keep the hit if it is closer than the best one so far
-        if (t >= 0 && t < nearest_t)
+        if (t > 0 && t < nearest_t)
         {
             nearest_t = t;
             p = tmp_p;
             N = tmp_N;
             hit = true;
         }
+
+    };
+
+    if (!use_bvh)
+    {
+        for (int i = 0; i < facets.rows(); ++i)
+        {
+            triangle_test(i);
+        }
+        return hit;
     }
+    
     return hit;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
