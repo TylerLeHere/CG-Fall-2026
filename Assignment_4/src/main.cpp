@@ -51,7 +51,15 @@ private:
 const std::string data_dir = DATA_DIR;
 const std::string filename("raytrace.png");
 const std::string mesh_filename(data_dir + "bunny.off");
+
 const bool use_bvh = true;
+
+const bool enable_sphere_and_parallelograms = true; // Bonus 1
+std::vector<Vector3d> sphere_centers;
+std::vector<double> sphere_raddi;
+std::vector<Matrix3d> parallelograms;
+
+
 
 //Camera settings
 const double focal_length = 2;
@@ -105,6 +113,23 @@ void setup_scene()
 
     //setup tree
     bvh = AABBTree(vertices, facets);
+
+    if(enable_sphere_and_parallelograms)
+    {
+        // Left Spheres
+        sphere_centers.emplace_back(-0.8, -0.3, 0.1);
+        sphere_raddi.emplace_back(0.2);
+        
+        // Right Spheres
+        sphere_centers.emplace_back(0.8, -0.25, -0.3);
+        sphere_raddi.push_back(0.25);
+
+        Matrix3d floor_corners;
+        floor_corners.col(0) = Vector3d(-10, -0.5, -10);
+        floor_corners.col(1) = Vector3d(-10, -0.5, 10);
+        floor_corners.col(2) = Vector3d(10, -0.5, -10);
+        parallelograms.emplace_back(floor_corners);
+    }
 
     //Lights
     light_positions.emplace_back(8, 8, 0);
@@ -316,11 +341,96 @@ bool ray_box_intersection(const Vector3d &ray_origin, const Vector3d &ray_direct
 }
 
 
+
+double ray_sphere_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, int sphere_index, Vector3d &p, Vector3d &N)
+{
+
+    const Vector3d sphere_center = sphere_centers[sphere_index];
+    const double sphere_radius = sphere_raddi[sphere_index];
+
+    const Vector3d oc = ray_origin - sphere_center;
+    const double a = ray_direction.dot(ray_direction);
+    const double b = 2.0 * ray_direction.dot(oc);
+    const double c = oc.dot(oc) - sphere_radius * sphere_radius;
+
+    const double discriminant = b * b - 4 * a * c;
+    if (discriminant < 0)
+    {
+        return -1; // No intersection
+    }
+    else
+    {
+        // Find the nearest intersection point
+        const double sqrt_discriminant = std::sqrt(discriminant);
+        const double t1 = (-b - sqrt_discriminant) / (2.0 * a);
+        const double t2 = (-b + sqrt_discriminant) / (2.0 * a);
+
+        double t = std::min(t1, t2);
+        if (t < 0)
+        {
+            t = std::max(t1, t2); // If the nearest intersection is behind the ray origin, check the other intersection
+            if (t < 0)
+            {
+                return -1; // Both intersections are behind the ray origin
+            }
+        }
+
+        p = ray_origin + t * ray_direction;
+        N = (p - sphere_center).normalized();
+        return t;
+    }
+}
+
+double ray_parallelogram_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, int parallelogram_index, Vector3d &p, Vector3d &N)
+{
+    const Vector3d pgram_origin = parallelograms[parallelogram_index].col(0);
+    const Vector3d edge_u = parallelograms[parallelogram_index].col(1) - pgram_origin;
+    const Vector3d edge_v = parallelograms[parallelogram_index].col(2) - pgram_origin;
+
+    Matrix3d system;
+    system.col(0) = -ray_direction;
+    system.col(1) = edge_u;
+    system.col(2) = edge_v;
+
+    bool is_invertible;
+    Matrix3d inverse;
+    system.computeInverseWithCheck(inverse, is_invertible);
+    if (!is_invertible){
+        return -1; // Ray is parallel to the parallelogram plane
+    }
+
+    const Vector3d sol = inverse * (ray_origin - pgram_origin);
+    const double t = sol(0);
+    const double u = sol(1);
+    const double v = sol(2);
+
+    if (t < 0 || u < 0 || v < 0 || u > 1 || v > 1){
+        return -1; // Intersection is outside the parallelogram
+    }
+
+    p = ray_origin + t * ray_direction;
+    N = edge_u.cross(edge_v).normalized();
+    if(N.dot(ray_direction) > 0){
+        N = -N; // Ensure the normal is facing against the ray direction
+    }
+    return t;
+}
+
 bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_direction, Vector3d &p, Vector3d &N)
 {
     Vector3d tmp_p, tmp_N;
     double nearest_t = std::numeric_limits<double>::max();
     bool hit = false;
+
+    auto update_closest_hit = [&](double t) {
+        if (t >= 0 && t < nearest_t)
+        {
+            nearest_t = t;
+            p = tmp_p;
+            N = tmp_N;
+            hit = true;
+        }
+    };
     
     // Tests one by one all the triangles in the mesh, and keeps it if it is the cloest
     auto triangle_test = [&](int triangle){
@@ -329,15 +439,23 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
         const Vector3d c = vertices.row(facets(triangle, 2));
 
         const double t = ray_triangle_intersection(ray_origin, ray_direction, a, b, c, tmp_p, tmp_N);
-        if (t >= 0 && t < nearest_t)
+        update_closest_hit(t);
+    };
+
+    if (enable_sphere_and_parallelograms)
+    {
+        for (int i = 0; i < sphere_centers.size(); ++i)
         {
-            nearest_t = t;
-            p = tmp_p;
-            N = tmp_N;
-            hit = true;
+            const double t = ray_sphere_intersection(ray_origin, ray_direction, i, tmp_p, tmp_N);
+            update_closest_hit(t);
         }
 
-    };
+        for (int i = 0; i < parallelograms.size(); ++i)
+        {
+            const double t = ray_parallelogram_intersection(ray_origin, ray_direction, i, tmp_p, tmp_N);
+            update_closest_hit(t);
+        }
+    }
 
     if (!use_bvh)
     {
@@ -349,11 +467,12 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
     }
 
     // Ex2: Traverse the bounding box tree
-    if(bvh.root == -1){
-        return false;
-    }
+
     std::vector<int> to_visit;
-    to_visit.push_back(bvh.root);
+    if(bvh.root != -1){
+        to_visit.push_back(bvh.root);
+    }
+    
     while(!to_visit.empty())
     {
         const int index = to_visit.back();
@@ -375,6 +494,9 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
     return hit;
 
 }
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Raytracer code
