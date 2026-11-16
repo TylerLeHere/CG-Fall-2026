@@ -235,7 +235,6 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
 
 double ray_triangle_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, const Vector3d &a, const Vector3d &b, const Vector3d &c, Vector3d &p, Vector3d &N)
 {
-
     bool is_invertible;
     Matrix3d inverse;
     const Vector3d edge_u = b - a;
@@ -316,8 +315,7 @@ bool ray_box_intersection(const Vector3d &ray_origin, const Vector3d &ray_direct
     return true;
 }
 
-//Finds the closest intersecting object returns its index
-//In case of intersection it writes into p and N (intersection point and normals)
+
 bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_direction, Vector3d &p, Vector3d &N)
 {
     Vector3d tmp_p, tmp_N;
@@ -326,9 +324,9 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
     
     // Tests one by one all the triangles in the mesh, and keeps it if it is the cloest
     auto triangle_test = [&](int triangle){
-        const Vector3d &a = vertices.row(facets(triangle, 0));
-        const Vector3d &b = vertices.row(facets(triangle, 1));
-        const Vector3d &c = vertices.row(facets(triangle, 2));
+        const Vector3d a = vertices.row(facets(triangle, 0));
+        const Vector3d b = vertices.row(facets(triangle, 1));
+        const Vector3d c = vertices.row(facets(triangle, 2));
 
         const double t = ray_triangle_intersection(ray_origin, ray_direction, a, b, c, tmp_p, tmp_N);
         if (t >= 0 && t < nearest_t)
