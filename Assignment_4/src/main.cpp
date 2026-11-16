@@ -52,9 +52,12 @@ const std::string data_dir = DATA_DIR;
 const std::string filename("raytrace.png");
 const std::string mesh_filename(data_dir + "bunny.off");
 
-const bool use_bvh = true;
+const bool use_bvh = true; // Setting this to be true to use AABB tree in EX2
 
 const bool enable_sphere_and_parallelograms = true; // Bonus 1
+const bool enable_shadows = true; // Bonus 2
+const bool enable_reflections = true; // Bonus 3
+const int max_bounce = 3;
 std::vector<Vector3d> sphere_centers;
 std::vector<double> sphere_raddi;
 std::vector<Matrix3d> parallelograms;
@@ -472,7 +475,7 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
     if(bvh.root != -1){
         to_visit.push_back(bvh.root);
     }
-    
+
     while(!to_visit.empty())
     {
         const int index = to_visit.back();
@@ -495,6 +498,16 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
 
 }
 
+bool is_light_visible(const Vector3d &ray_origin, const Vector3d &ray_direction, const Vector3d &light_position){
+    Vector3d hit_point, hit_normal;
+    if(!find_nearest_object(ray_origin, ray_direction, hit_point, hit_normal)){
+        return true; // No intersection, light is visible
+    }
+
+    const double hit_distance = (hit_point - ray_origin).norm();
+    const double light_distance = (light_position - ray_origin).norm();
+    return hit_distance > light_distance; // Light is visible if the intersection is farther than the light
+}
 
 
 
@@ -502,7 +515,7 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
 // Raytracer code
 ////////////////////////////////////////////////////////////////////////////////
 
-Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction)
+Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, int bounces)
 {
     //Intersection point and normal, these are output of find_nearest_object
     Vector3d p, N;
@@ -529,6 +542,10 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction)
 
         // Diffuse contribution
         const Vector3d Li = (light_position - p).normalized();
+        const Vector3d shadow_ray_origin = p + 1e-4 * Li; // Offset the origin to avoid self-intersection
+        if(enable_shadows && !is_light_visible(shadow_ray_origin, Li, light_position)){
+            continue; // Light is blocked, skip this light
+        }
         const Vector4d diffuse = diff_color * std::max(Li.dot(N), 0.0);
 
         // Specular contribution
@@ -542,15 +559,18 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction)
     }
 
     // Rendering equation
-    Vector4d C = ambient_color + lights_color;
-
-    //Set alpha to 1
-    C(3) = 1;
-
+    Vector4d reflection_color(0, 0, 0, 0);
+    if(enable_reflections && bounces > 0)
+    {
+        const Vector3d reflected_direction = ray_direction - 2 * ray_direction.dot(N) * N;
+        const Vector3d reflected_origin = p + 1e-4 * reflected_direction; // Offset the origin to avoid self-intersection
+        reflection_color = obj_reflection_color.cwiseProduct(shoot_ray(reflected_origin, reflected_direction, bounces - 1));
+    }
+    Vector4d C = ambient_color + lights_color + reflection_color;
+    C(3) = 1; // Set alpha to 1 for opaque objects
     return C;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 
 void raytrace_scene()
 {
@@ -599,7 +619,7 @@ void raytrace_scene()
                 ray_direction = Vector3d(0, 0, -1);
             }
 
-            const Vector4d C = shoot_ray(ray_origin, ray_direction);
+            const Vector4d C = shoot_ray(ray_origin, ray_direction, max_bounce);
             R(i, j) = C(0);
             G(i, j) = C(1);
             B(i, j) = C(2);
