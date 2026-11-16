@@ -51,7 +51,7 @@ private:
 const std::string data_dir = DATA_DIR;
 const std::string filename("raytrace.png");
 const std::string mesh_filename(data_dir + "bunny.off");
-const bool use_bvh = false;
+const bool use_bvh = true;
 
 //Camera settings
 const double focal_length = 2;
@@ -235,9 +235,6 @@ int AABBTree::build_recursive(const MatrixXd &V, const MatrixXi &F, const Matrix
 
 double ray_triangle_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, const Vector3d &a, const Vector3d &b, const Vector3d &c, Vector3d &p, Vector3d &N)
 {
-    // TODO
-    // Compute whether the ray intersects the given triangle.
-    // If you have done the parallelogram case, this should be very similar to it.
 
     bool is_invertible;
     Matrix3d inverse;
@@ -353,6 +350,30 @@ bool find_nearest_object(const Vector3d &ray_origin, const Vector3d &ray_directi
         return hit;
     }
 
+    // Ex2: Traverse the bounding box tree
+    if(bvh.root == -1){
+        return false;
+    }
+    std::vector<int> to_visit;
+    to_visit.push_back(bvh.root);
+    while(!to_visit.empty())
+    {
+        const int index = to_visit.back();
+        to_visit.pop_back();
+
+        const AABBTree::Node &node = bvh.nodes[index];
+
+        if(!ray_box_intersection(ray_origin, ray_direction, node.bbox)){
+            continue;
+        }
+
+        if (node.triangle != -1){
+            triangle_test(node.triangle);
+        } else {
+            to_visit.push_back(node.left);
+            to_visit.push_back(node.right);
+        }
+    }
     return hit;
 
 }
