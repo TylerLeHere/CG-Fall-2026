@@ -280,10 +280,43 @@ double ray_triangle_intersection(const Vector3d &ray_origin, const Vector3d &ray
 
 bool ray_box_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, const AlignedBox3d &box)
 {
-    // TODO
-    // Compute whether the ray intersects the given box.
-    // we are not testing with the real surface here anyway.
-    return false;
+    if(box.isEmpty()){
+        return false;
+    }
+
+    double t_enter = 0.0;
+    double t_exit = std::numeric_limits<double>::infinity();
+
+    for (int axis = 0; axis < 3; ++axis){
+        const double origin = ray_origin(axis);
+        const double direction = ray_direction(axis);
+        const double box_min = box.min()(axis);
+        const double box_max = box.max()(axis);
+
+        if (direction == 0.0){
+            if (origin < box_min || origin > box_max){
+                return false;
+            }
+            continue;
+        }
+
+        // The ray crosses each plan on the axis here
+        double t_near = (box_min - origin) / direction;
+        double t_far = (box_max - origin) / direction;
+
+        if (t_near > t_far){
+            std::swap(t_near, t_far);
+        }
+
+        t_enter = std::max(t_enter, t_near);
+        t_exit = std::min(t_exit, t_far);
+
+        if (t_enter > t_exit){
+            return false;
+        }
+    }
+
+    return true;
 }
 
 //Finds the closest intersecting object returns its index
